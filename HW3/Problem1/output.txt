@@ -1,92 +1,19 @@
 rm prob1
-gcc -o prob1 prob1.c -std=c99 -march=native -msse4a -Ofast -lm -fopenmp
+nvcc -o prob1 prob1.cu
 Multi Thread Computation Start
-Multi Thread Computation End: 300521.955 us.
+Multi Thread Computation End: 1215694.714 us.
 Single Thread Computation Start
-Single Thread Computation End: 1258291.778 us.
+Single Thread Computation End: 9831902.224 us.
 Verification Success.
 Multi Thread Computation Start
-Multi Thread Computation End: 144914.325 us.
+Multi Thread Computation End: 107114.800 us.
 Single Thread Computation Start
-Single Thread Computation End: 1309435.560 us.
-Verification Success.
+Single Thread Computation End: 362386031.668 us.
+Verification Fail.
+(0, 0): 734.913208 - 754.961731
 Multi Thread Computation Start
-Multi Thread Computation End: 100348.263 us.
+Multi Thread Computation End: 243625.587 us.
 Single Thread Computation Start
-Single Thread Computation End: 1267067.386 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 74524.027 us.
-Single Thread Computation Start
-Single Thread Computation End: 1335211.599 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 66718.665 us.
-Single Thread Computation Start
-Single Thread Computation End: 1281765.688 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 57736.093 us.
-Single Thread Computation Start
-Single Thread Computation End: 1279749.401 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 10310369.430 us.
-Single Thread Computation Start
-Single Thread Computation End: 243594768.895 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 6021579.561 us.
-Single Thread Computation Start
-Single Thread Computation End: 243878590.856 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 3962236.712 us.
-Single Thread Computation Start
-Single Thread Computation End: 242797912.934 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 2924398.540 us.
-Single Thread Computation Start
-Single Thread Computation End: 243698796.290 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 2392133.465 us.
-Single Thread Computation Start
-Single Thread Computation End: 246364394.544 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 2027458.361 us.
-Single Thread Computation Start
-Single Thread Computation End: 245349564.386 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 49940619.745 us.
-Single Thread Computation Start
-Single Thread Computation End: 1242261863.124 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 27840844.391 us.
-Single Thread Computation Start
-Single Thread Computation End: 1252528608.578 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 18144557.373 us.
-Single Thread Computation Start
-Single Thread Computation End: 1251763754.246 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 13970016.481 us.
-Single Thread Computation Start
-Single Thread Computation End: 1258690310.779 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 11335971.419 us.
-Single Thread Computation Start
-Single Thread Computation End: 1258157923.422 us.
-Verification Success.
-Multi Thread Computation Start
-Multi Thread Computation End: 9932932.610 us.
-Single Thread Computation Start
-Single Thread Computation End: 1257353637.782 us.
-Verification Success.
+Single Thread Computation End: 1621076665.995 us.
+Verification Fail.
+(0, 0): -0.000000 - 1266.649048

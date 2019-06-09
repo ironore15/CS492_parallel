@@ -1,12 +1,11 @@
-CC = gcc
-CFLAGS = -std=c99 -march=native -msse4a -Ofast -lm -fopenmp
+CC = nvcc
 TARGET = prob1
-OBJECTS = prob1.c
+OBJECTS = prob1.cu
 
 all : $(TARGET)
 
 $(TARGET) : $(OBJECTS)
-	$(CC) -o $@ $^ $(CFLAGS)
+	$(CC) -o $@ $^
 
 clean :
 	rm $(TARGET)
