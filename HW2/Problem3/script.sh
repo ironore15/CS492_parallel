@@ -1,6 +1,6 @@
 #/bin/bash
 
-g++ sparse.cpp mmreader.cpp -o sparse -lpthread -I/usr/include/glib-2.0 -I/usr/lib/x86_64-linux-gnu/glib-2.0/include
+g++ sparse.cpp mmreader.cpp -o sparse -fopenmp
 
 ./sparse ./matrix/2cubes_sphere.mtx 2048
 ./sparse ./matrix/cage12.mtx 1024

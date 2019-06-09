@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include <math.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -9,15 +8,8 @@
 #define NANO 1000000000
 #define PGSIZE 0x1000
 
-struct param
-{
-    int start;
-    int end;
-};
-
-int size;
+int size, numThreads;
 double **matrixA, **matrixB, **matrixBT, **matrixC_serial, **matrixC_multiple;
-pthread_barrier_t transpose_barrier;
 
 double **make_matrix(int size)
 {
@@ -63,6 +55,7 @@ void set_matrix(double **matrix, int size)
 
 void trans_routine(double **matrix, double **matrixT, int start, int end)
 {
+    #pragma omp parallel for num_threads(numThreads)
     for (int i = start; i < end; i++)
     {
         for (int j = 0; j < size; j++)
@@ -72,12 +65,12 @@ void trans_routine(double **matrix, double **matrixT, int start, int end)
 
 void mmul_routine(double **matrixA, double **matrixB, double **matrixC, int start, int end)
 {
-    double sum;
+    #pragma omp parallel for num_threads(numThreads)
     for (int i = start; i < end; i++)
     {
         for (int j = 0; j < size; j++)
         {
-            sum = 0.0;
+            double sum = 0.0;
             for (int k = 0; k < size; k++)
                 sum += matrixA[i][k] * matrixB[j][k];
             matrixC[i][j] = sum;
@@ -97,16 +90,11 @@ void print_matrix(double **matrix, int size)
     printf(" ]\n");
 }
 
-void *thread_routine(void *bound)
+void *thread_routine(void *param)
 {
-    struct param *param = (struct param *) bound;
-    int start = param->start;
-    int end = param->end;
+    trans_routine(matrixB, matrixBT, 0, size);
 
-    trans_routine(matrixB, matrixBT, start, end);
-    pthread_barrier_wait(&transpose_barrier);
-
-    mmul_routine(matrixA, matrixBT, matrixC_multiple, start, end);
+    mmul_routine(matrixA, matrixBT, matrixC_multiple, 0, size);
     return NULL;
 }
 
@@ -125,7 +113,7 @@ void serial_mmul(double **matrixA, double **matrixB, double **matrixC)
 
 int main(int argc, char **argv, char **envp)
 {
-    int opt, numThreads = 0;
+    int opt;
     struct timespec tstart, tend;
 
     while ((opt = getopt(argc, argv, "n:p:")) != -1)
@@ -150,8 +138,6 @@ int main(int argc, char **argv, char **envp)
         exit(0);
     }
 
-    int amount = size / numThreads;
-
     matrixA = make_matrix(size);
     matrixB = make_matrix(size);
     matrixC_serial = make_matrix(size);
@@ -171,30 +157,7 @@ int main(int argc, char **argv, char **envp)
 
     matrixBT = make_matrix(size);
 
-    pthread_t *threads = (pthread_t *) malloc((numThreads - 1) * sizeof(pthread_t));
-    struct param *bounds = (struct param *) malloc(sizeof(struct param) * numThreads);
-
-    pthread_barrier_init(&transpose_barrier, NULL, numThreads);
-
-    for (int i = 0; i < numThreads; i++)
-    {
-        if (i == 0)
-            bounds[i].start = 0;
-        else
-            bounds[i].start = bounds[i-1].end;
-
-        if (i == numThreads - 1)
-            bounds[i].end = size;
-        else
-            bounds[i].end = bounds[i].start + amount;
-    }
-
-    for (int i = 0; i < numThreads - 1; i++)
-        pthread_create(&threads[i], NULL, thread_routine, (void *) &bounds[i]);
-    thread_routine(&bounds[numThreads - 1]);
-
-    for (int i = 0; i < numThreads - 1; i++)
-        pthread_join(threads[i], NULL);
+    thread_routine(NULL);
 
     if (clock_gettime(CLOCK_MONOTONIC, &tend) == -1)
     {

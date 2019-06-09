@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -std=c99 -march=native -Ofast -pthread
+CFLAGS = -std=c99 -march=native -msse4a -Ofast -pthread -lm
 TARGET = prob1
 OBJECTS = prob1.c
 

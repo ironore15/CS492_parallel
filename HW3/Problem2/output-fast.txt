@@ -1,0 +1,20 @@
+rm prob2
+gcc -o prob2 prob2.c -std=c99 -march=native -Ofast -lm -fopenmp
+Multi Thread Computation Start
+Multi Thread Computation End: 82114.073 us.
+L2-norm : 5.38234e-12
+Multi Thread Computation Start
+Multi Thread Computation End: 40017.282 us.
+L2-norm : 5.38234e-12
+Multi Thread Computation Start
+Multi Thread Computation End: 27459.718 us.
+L2-norm : 5.38234e-12
+Multi Thread Computation Start
+Multi Thread Computation End: 22918.516 us.
+L2-norm : 5.38234e-12
+Multi Thread Computation Start
+Multi Thread Computation End: 19417.067 us.
+L2-norm : 5.38234e-12
+Multi Thread Computation Start
+Multi Thread Computation End: 17132.861 us.
+L2-norm : 5.38234e-12

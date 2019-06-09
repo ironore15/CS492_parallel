@@ -1,7 +1,7 @@
 CC = gcc
-CFLAGS = -std=c99 -march=native -O0 -pthread -lm
-TARGET = prob2
-OBJECTS = prob2.c
+CFLAGS = -std=c99 -march=native -msse4a -Ofast -lm -fopenmp
+TARGET = prob1
+OBJECTS = prob1.c
 
 all : $(TARGET)
 

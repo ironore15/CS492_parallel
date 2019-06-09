@@ -1,6 +1,5 @@
 #define _GNU_SOURCE
 #include <math.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -9,15 +8,9 @@
 #define NANO 1000000000
 #define PGSIZE 0x1000
 
-struct param
-{
-    int index;
-};
-
 int size = 0, numThreads = 0;
 int *pivot_arr;
 double **matrixA, *vectorB, *vectorX;
-pthread_barrier_t thread_barrier;
 
 double *make_vector(int size)
 {
@@ -86,26 +79,37 @@ void set_vector(double *vector, int size)
 
 int pivot_routine(double **matrix, int start, int end, int pivot)
 {
-    double abs, max = 0.0;
-    int maxi = pivot;
-    for (int i = start; i < end; i++)
+    double t_max = 0.0, max = 0.0;
+    int t_maxi = pivot, maxi = pivot;
+    #pragma omp parallel firstprivate(max, maxi) num_threads(numThreads)
     {
-        abs = fabs(matrix[i][pivot]);
-        if (abs > max)
+        #pragma omp for nowait
+        for (int i = start; i < end; i++)
         {
-            max = abs;
-            maxi = i;
+            double abs = fabs(matrix[i][pivot]);
+            if (abs > max)
+            {
+                max = abs;
+                maxi = i;
+            }
+        }
+
+        #pragma omp critical
+        if (max > t_max)
+        {
+            t_max = max;
+            t_maxi = maxi;
         }
     }
-    return maxi;
+    return t_maxi;
 }
 
 void gauss_routine(double **matrix, double *vector, int start, int end, int pivot)
 {
-    double m;
+    #pragma omp parallel for num_threads(numThreads)
     for (int i = start; i < end; i++)
     {
-        m = matrix[i][pivot] / matrix[pivot][pivot];
+        double m = matrix[i][pivot] / matrix[pivot][pivot];
 
         for (int j = pivot; j < size; j++)
             matrix[i][j] -= m * matrix[pivot][j];
@@ -154,51 +158,24 @@ double L2_norm(double **matrixA, double *vectorX, double *vectorB)
     return sqrt(norm);
 }
 
-void *thread_routine(void *bound)
+void *thread_routine(void *param)
 {
-    struct param *param = (struct param *) bound;
-    int index = param->index;
-    int start, end, maxi;
-    double amount, abs, max, swap, *swap_row;
+    int maxi;
+    double swap, *swap_row;
 
     for (int i = 0; i < size; i++)
     {
-        amount = (double) (size - i) / (double) numThreads;
+        maxi = pivot_routine(matrixA, i, size, i);
 
-        start = lround(index * amount) + i;
-        end = lround((index + 1) * amount) + i;
+        swap = vectorB[i];
+        vectorB[i] = vectorB[maxi];
+        vectorB[maxi] = swap;
 
-        pivot_arr[index] = pivot_routine(matrixA, start, end, i);
-        pthread_barrier_wait(&thread_barrier);
+        swap_row = matrixA[i];
+        matrixA[i] = matrixA[maxi];
+        matrixA[maxi] = swap_row;
 
-        if (index == 0)
-        {
-            max = 0.0;
-            for (int j = 0; j < numThreads; j++)
-            {
-                abs = fabs(matrixA[pivot_arr[j]][i]);
-                if (abs > max)
-                {
-                    max = abs;
-                    maxi = pivot_arr[j];
-                }
-            }
-
-            swap = vectorB[i];
-            vectorB[i] = vectorB[maxi];
-            vectorB[maxi] = swap;
-
-            swap_row = matrixA[i];
-            matrixA[i] = matrixA[maxi];
-            matrixA[maxi] = swap_row;
-        }
-        pthread_barrier_wait(&thread_barrier);
-
-        if (start == i)
-            start += 1;
-
-        gauss_routine(matrixA, vectorB, start, end, i);
-        pthread_barrier_wait(&thread_barrier);
+        gauss_routine(matrixA, vectorB, i + 1, size, i);
     }
 
     return NULL;
@@ -251,21 +228,7 @@ int main(int argc, char **argv, char **envp)
         exit(0);
     }
 
-    pthread_t *threads = (pthread_t *) malloc((numThreads - 1) * sizeof(pthread_t));
-    struct param *bounds = (struct param *) malloc(sizeof(struct param) * numThreads);
-    pivot_arr = (int *) malloc(sizeof(int) * numThreads);
-
-    pthread_barrier_init(&thread_barrier, NULL, numThreads);
-
-    for (int i = 0; i < numThreads; i++)
-        bounds[i].index = i;
-
-    for (int i = 0; i < numThreads - 1; i++)
-        pthread_create(&threads[i], NULL, thread_routine, (void *) &bounds[i]);
-    thread_routine(&bounds[numThreads - 1]);
-
-    for (int i = 0; i < numThreads - 1; i++)
-        pthread_join(threads[i], NULL);
+    thread_routine(NULL);
 
     for (int i = size - 1; i >= 0; i--)
     {

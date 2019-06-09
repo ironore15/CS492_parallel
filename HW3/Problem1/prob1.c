@@ -1,6 +1,6 @@
 #define _GNU_SOURCE
+#include <cuda.h>
 #include <math.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -8,20 +8,31 @@
 
 #define NANO 1000000000
 #define PGSIZE 0x1000
+#define BLOCK 32
 
-struct param
+int size, numThreads;
+float *matrixA, *matrixB, *matrixBT, *matrixC_serial, *matrixC_cuda;
+
+__global__
+void cudaMatMul(float *A_d, float *B_d, float *C_d, int n)
 {
-    int start;
-    int end;
-};
+    int i = blockIdx.x * blockDim.x + threadIdx.x;
+    int j = blockIdx.y * blockDim.y + threadIdx.y;
+    float value = 0.0;
 
-int size;
-double **matrixA, **matrixB, **matrixBT, **matrixC_serial, **matrixC_multiple;
-pthread_barrier_t transpose_barrier;
+    if (i >= n || j >= n)
+        return;
 
-double **make_matrix(int size)
+    for (int k = 0; k < n; k++)
+        value += A_d[i * n + k] * B_d[k * n + j];
+
+    C_d[i * n + j] = value;
+    return;
+}
+
+float *make_matrix(int size)
 {
-    double **matrix = (double **) malloc(sizeof(double *) * size);
+    float *matrix = (float *) malloc(sizeof(float) * size * size);
     if (matrix == NULL)
     {
         perror("malloc");
@@ -33,99 +44,70 @@ double **make_matrix(int size)
         perror("malloc");
         exit(0);
     }
-
-    for (int i = 0; i < size; i++)
-    {
-        matrix[i] = (double *) malloc(sizeof(double) * size);
-        if (matrix[i] == NULL)
-        {
-            perror("malloc");
-            exit(0);
-        }
-    }
-
-    if (malloc(PGSIZE) == NULL)
-    {
-        perror("malloc");
-        exit(0);
-    }
     return matrix;
 }
 
-void set_matrix(double **matrix, int size)
+void set_matrix(float *matrix, int size)
 {
     for (int i = 0; i < size; i++)
     {
         for (int j = 0; j < size; j++)
-            matrix[i][j] = drand48();
+            matrix[i * size + j] = (float) drand48();
     }
 }
 
-void trans_routine(double **matrix, double **matrixT, int start, int end)
-{
-    for (int i = start; i < end; i++)
-    {
-        for (int j = 0; j < size; j++)
-            matrixT[i][j] = matrix[j][i];
-    }
-}
-
-void mmul_routine(double **matrixA, double **matrixB, double **matrixC, int start, int end)
-{
-    double sum;
-    for (int i = start; i < end; i++)
-    {
-        for (int j = 0; j < size; j++)
-        {
-            sum = 0.0;
-            for (int k = 0; k < size; k++)
-                sum += matrixA[i][k] * matrixB[j][k];
-            matrixC[i][j] = sum;
-        }
-    }
-}
-
-void print_matrix(double **matrix, int size)
+void print_matrix(double *matrix, int size)
 {
     printf("[");
     for (int i = 0; i < size; i++)
     {
         for (int j = 0; j < size; j++)
-            printf(" %f", matrix[i][j]);
+            printf(" %f", matrix[i * size + j]);
         printf(";");
     }
     printf(" ]\n");
 }
 
-void *thread_routine(void *bound)
+void cuda_mmul(float *A, float *B, float *C, int size)
 {
-    struct param *param = (struct param *) bound;
-    int start = param->start;
-    int end = param->end;
+    int mem_size = sizeof(float) * size * size;
+    int grid_size = (size - 1) / BLOCK + 1;
+    float *A_d, *B_d, *C_d;
+    dim3 dimBlock(BLOCK, BLOCK);
+    dim3 dimGrid(grid_size, grid_size);
 
-    trans_routine(matrixB, matrixBT, start, end);
-    pthread_barrier_wait(&transpose_barrier);
+    cudaMalloc((void **) &A_d, mem_size);
+    cudaMemcpy(A_d, A, mem_size, cudaMemcpyHostToDevice);
+    cudaMalloc((void **) &B_d, mem_size);
+    cudaMemcpy(B_d, B, mem_size, cudaMemcpyHostToDevice);
 
-    mmul_routine(matrixA, matrixBT, matrixC_multiple, start, end);
-    return NULL;
+    cudaMalloc((void **) &C_d, mem_size);
+
+    cudaMatMul(A_d, B_d, C_d, size);
+
+    cudaMemcpy(C, C_d, mem_size, cudaMemcpyDeviceToHost);
+
+    cudaFree(A_d);
+    cudaFree(B_d);
+    cudaFree(C_d);
 }
 
-void serial_mmul(double **matrixA, double **matrixB, double **matrixC)
+void serial_mmul(float *matrixA, float *matrixB, float *matrixC)
 {
     for (int i = 0; i < size; i++)
     {
         for (int j = 0; j < size; j++)
         {
-            matrixC[i][j] = 0.0;
+            matrixC[i * size + j] = 0.0;
             for (int k = 0; k < size; k++)
-                matrixC[i][j] += matrixA[i][k] * matrixB[k][j];
+                matrixC[i * size + j] += matrixA[i * size + k] * matrixB[k * size + j];
         }
     }
 }
 
 int main(int argc, char **argv, char **envp)
 {
-    int opt, numThreads = 0;
+    int opt;
     struct timespec tstart, tend;
 
     while ((opt = getopt(argc, argv, "n:p:")) != -1)
@@ -150,12 +132,10 @@ int main(int argc, char **argv, char **envp)
         exit(0);
     }
 
-    int amount = size / numThreads;
-
     matrixA = make_matrix(size);
     matrixB = make_matrix(size);
     matrixC_serial = make_matrix(size);
-    matrixC_multiple = make_matrix(size);
+    matrixC_cuda = make_matrix(size);
 
     srand48(time(NULL));
     set_matrix(matrixA, size);
@@ -171,30 +151,7 @@ int main(int argc, char **argv, char **envp)
 
     matrixBT = make_matrix(size);
 
-    pthread_t *threads = (pthread_t *) malloc((numThreads - 1) * sizeof(pthread_t));
-    struct param *bounds = (struct param *) malloc(sizeof(struct param) * numThreads);
-
-    pthread_barrier_init(&transpose_barrier, NULL, numThreads);
-
-    for (int i = 0; i < numThreads; i++)
-    {
-        if (i == 0)
-            bounds[i].start = 0;
-        else
-            bounds[i].start = bounds[i-1].end;
-
-        if (i == numThreads - 1)
-            bounds[i].end = size;
-        else
-            bounds[i].end = bounds[i].start + amount;
-    }
-
-    for (int i = 0; i < numThreads - 1; i++)
-        pthread_create(&threads[i], NULL, thread_routine, (void *) &bounds[i]);
-    thread_routine(&bounds[numThreads - 1]);
-
-    for (int i = 0; i < numThreads - 1; i++)
-        pthread_join(threads[i], NULL);
+    cuda_mmul(matrixA, matrixB, matrixC_cuda, size);
 
     if (clock_gettime(CLOCK_MONOTONIC, &tend) == -1)
     {
@@ -234,9 +191,10 @@ int main(int argc, char **argv, char **envp)
     {
         for (int j = 0; j < size; j++)
         {
-            if (fabs(matrixC_serial[i][j] - matrixC_multiple[i][j]) > 1e-10)
+            if (fabs(matrixC_cuda[i * size + j] - matrixC_serial[i * size + j]) > 1e-8)
             {
                 printf("Verification Fail.\n");
+                printf("(%d, %d): %f - %f\n", i, j, matrixC_cuda[i * size + j], matrixC_serial[i * size + j]);
                 exit(0);
             }
         }

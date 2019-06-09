@@ -113,21 +113,17 @@ void multiply_single(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mtx
     }
 }
 
-void *thread_routine(void *p)
+void multiply_openmp(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mtx *C)
 {
-    struct sparse_mtx *A = ((struct param *) p)->A;
-    struct dense_mtx *B = ((struct param *) p)->B;
-    struct dense_mtx *C = ((struct param *) p)->C;
-    int start = ((struct param *) p)->start;
-    int end = ((struct param *) p)->end;
+    C->nrow = A->nrow;
+    C->ncol = B->ncol;
+    C->val = (float *)calloc(C->nrow * C->ncol, sizeof(float));
 
-    for (int row = start; row < end; row++)
+    #pragma omp parallel for schedule(guided, 16) num_threads(THREAD)
+    for (int row = 0; row < A->nrow; row++)
     {
         int32_t start = A->row[row];
         int32_t end = A->row[row + 1];
-
-        if (start == A->nnze)
-            break;
 
         for (int i = start; i < end; i++)
         {
@@ -138,44 +134,6 @@ void *thread_routine(void *p)
                 C->val[C->ncol * row + j] += val * B->val[B->ncol * col + j];
         }
     }
-}
-
-void multiply_pthread(struct sparse_mtx *A, struct dense_mtx *B, struct dense_mtx *C)
-{
-    pthread_t *threads = (pthread_t *)malloc(sizeof(pthread_t) * (THREAD - 1));
-    struct param *params = (struct param *)malloc(sizeof(struct param) * THREAD);
-
-    C->nrow = A->nrow;
-    C->ncol = B->ncol;
-    C->val = (float *)calloc(C->nrow * C->ncol, sizeof(float));
-
-    int start = 0, thread = 0;
-
-    for (int i = 0; i < A->nrow; i++)
-    {
-        if (A->row[i] - A->row[start] > A->nnze / THREAD)
-        {
-            params[thread].A = A;
-            params[thread].B = B;
-            params[thread].C = C;
-            params[thread].start = start;
-            params[thread].end = i;
-            pthread_create(&threads[thread], NULL, thread_routine, &params[thread]);
-            start = i;
-
-            if (++thread >= THREAD - 1)
-                break;
-        }
-    }
-    params[thread].A = A;
-    params[thread].B = B;
-    params[thread].C = C;
-    params[thread].start = start;
-    params[thread].end = A->nrow;
-    thread_routine(&params[thread]);
-
-    for (int i = 0; i < THREAD - 1; i++)
-        pthread_join(threads[i], NULL);
 }
 
 int compare_matrix(struct dense_mtx *C1, struct dense_mtx *C2)
@@ -243,7 +201,7 @@ int main(int argc, char **argv)
     std::cout << "Single Thread Computation End: " << end - start  << " us." << std::endl;
     std::cout << "Multi Thread Computation Start" << std::endl;
     start = GetTimeStamp();
-    multiply_pthread(&A, &B, &C2);
+    multiply_openmp(&A, &B, &C2);
     end = GetTimeStamp();
     std::cout << "Multi Thread Computation End: " << end - start << " us." << std::endl;
 
