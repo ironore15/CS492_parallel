@@ -14,16 +14,6 @@
 int size;
 float *matrixA, *matrixB, *matrixBT, *matrixC_serial, *matrixC_cuda;
 
-#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line)
-{
-   if (code != cudaSuccess) 
-   {
-      fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      exit(code);
-   }
-}
-
 __global__
 void cudaMatMul(float *A_d, float *B_d, float *C_d, int x, int y, int n, int size)
 {
@@ -86,12 +76,12 @@ void cuda_mmul(float *A, float *B, float *C, int size)
     dim3 dimBlock(BLOCK, BLOCK);
     dim3 dimGrid(GRID, GRID);
 
-    gpuErrchk(cudaMalloc((void **) &A_d, mem_size));
-    gpuErrchk(cudaMemcpy(A_d, A, mem_size, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMalloc((void **) &B_d, mem_size));
-    gpuErrchk(cudaMemcpy(B_d, B, mem_size, cudaMemcpyHostToDevice));
+    cudaMalloc((void **) &A_d, mem_size);
+    cudaMemcpy(A_d, A, mem_size, cudaMemcpyHostToDevice);
+    cudaMalloc((void **) &B_d, mem_size);
+    cudaMemcpy(B_d, B, mem_size, cudaMemcpyHostToDevice);
 
-    gpuErrchk(cudaMalloc((void **) &C_d, mem_size));
+    cudaMalloc((void **) &C_d, mem_size);
 
     for (int i = 0; i < size / SUBSIZE; i++)
     {
@@ -99,14 +89,11 @@ void cuda_mmul(float *A, float *B, float *C, int size)
             cudaMatMul<<<dimBlock, dimGrid>>>(A_d, B_d, C_d, i, j, SUBSIZE, size);
     }
 
-    gpuErrchk( cudaPeekAtLastError() );
-    gpuErrchk( cudaDeviceSynchronize() );
+    cudaMemcpy(C, C_d, mem_size, cudaMemcpyDeviceToHost);
 
-    gpuErrchk(cudaMemcpy(C, C_d, mem_size, cudaMemcpyDeviceToHost));
-
-    gpuErrchk(cudaFree(A_d));
-    gpuErrchk(cudaFree(B_d));
-    gpuErrchk(cudaFree(C_d));
+    cudaFree(A_d);
+    cudaFree(B_d);
+    cudaFree(C_d);
 }
 
 void serial_mmul(float *matrixA, float *matrixB, float *matrixC)
