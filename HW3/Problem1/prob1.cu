@@ -8,18 +8,29 @@
 #define NANO 1000000000
 #define PGSIZE 0x1000
 #define BLOCK 32
+#define GRID 32
 
 int size;
 float *matrixA, *matrixB, *matrixBT, *matrixC_serial, *matrixC_cuda;
 
-__global__
-void cudaMatMul(float *A_d, float *B_d, float *C_d, int n)
+#define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line)
 {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
+   if (code != cudaSuccess) 
+   {
+      fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      exit(code);
+   }
+}
+
+__global__
+void cudaMatMul(float *A_d, float *B_d, float *C_d, int x, int y, int n)
+{
+    int i = n * x + blockIdx.x * blockDim.x + threadIdx.x;
+    int j = n * y + blockIdx.y * blockDim.y + threadIdx.y;
     float value = 0.0;
 
-    if (i >= n || j >= n)
+    if (i >= n * (x + 1) || j >= n * (y + 1))
         return;
 
     for (int k = 0; k < n; k++)
@@ -70,25 +81,31 @@ void print_matrix(double *matrix, int size)
 void cuda_mmul(float *A, float *B, float *C, int size)
 {
     int mem_size = sizeof(float) * size * size;
-    int grid_size = (size - 1) / BLOCK + 1;
     float *A_d, *B_d, *C_d;
     dim3 dimBlock(BLOCK, BLOCK);
-    dim3 dimGrid(grid_size, grid_size);
+    dim3 dimGrid(GRID, GRID);
 
-    cudaMalloc((void **) &A_d, mem_size);
-    cudaMemcpy(A_d, A, mem_size, cudaMemcpyHostToDevice);
-    cudaMalloc((void **) &B_d, mem_size);
-    cudaMemcpy(B_d, B, mem_size, cudaMemcpyHostToDevice);
+    gpuErrchk(cudaMalloc((void **) &A_d, mem_size));
+    gpuErrchk(cudaMemcpy(A_d, A, mem_size, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void **) &B_d, mem_size));
+    gpuErrchk(cudaMemcpy(B_d, B, mem_size, cudaMemcpyHostToDevice));
 
-    cudaMalloc((void **) &C_d, mem_size);
+    gpuErrchk(cudaMalloc((void **) &C_d, mem_size));
 
-    cudaMatMul<<<dimBlock, dimGrid>>>(A_d, B_d, C_d, size);
+    for (int i = 0; i < size / 1000; i++)
+    {
+        for (int j = 0; j < size / 1000; j++)
+            cudaMatMul<<<dimBlock, dimGrid>>>(A_d, B_d, C_d, i, j, 1000);
+    }
 
-    cudaMemcpy(C, C_d, mem_size, cudaMemcpyDeviceToHost);
+    gpuErrchk( cudaPeekAtLastError() );
+    gpuErrchk( cudaDeviceSynchronize() );
 
-    cudaFree(A_d);
-    cudaFree(B_d);
-    cudaFree(C_d);
+    gpuErrchk(cudaMemcpy(C, C_d, mem_size, cudaMemcpyDeviceToHost));
+
+    gpuErrchk(cudaFree(A_d));
+    gpuErrchk(cudaFree(B_d));
+    gpuErrchk(cudaFree(C_d));
 }
 
 void serial_mmul(float *matrixA, float *matrixB, float *matrixC)
@@ -191,7 +208,6 @@ int main(int argc, char **argv, char **envp)
             {
                 printf("Verification Fail.\n");
                 printf("(%d, %d): %f - %f\n", i, j, matrixC_cuda[i * size + j], matrixC_serial[i * size + j]);
-                exit(0);
             }
         }
     }
