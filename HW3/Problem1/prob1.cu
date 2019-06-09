@@ -7,8 +7,9 @@
 
 #define NANO 1000000000
 #define PGSIZE 0x1000
-#define BLOCK 32
-#define GRID 32
+#define SUBSIZE 1000
+#define BLOCK 128
+#define GRID 8
 
 int size;
 float *matrixA, *matrixB, *matrixBT, *matrixC_serial, *matrixC_cuda;
@@ -24,7 +25,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line)
 }
 
 __global__
-void cudaMatMul(float *A_d, float *B_d, float *C_d, int x, int y, int n)
+void cudaMatMul(float *A_d, float *B_d, float *C_d, int x, int y, int n, int size)
 {
     int i = n * x + blockIdx.x * blockDim.x + threadIdx.x;
     int j = n * y + blockIdx.y * blockDim.y + threadIdx.y;
@@ -33,10 +34,10 @@ void cudaMatMul(float *A_d, float *B_d, float *C_d, int x, int y, int n)
     if (i >= n * (x + 1) || j >= n * (y + 1))
         return;
 
-    for (int k = 0; k < n; k++)
-        value += A_d[i * n + k] * B_d[k * n + j];
+    for (int k = 0; k < size; k++)
+        value += A_d[i * size + k] * B_d[k * size + j];
 
-    C_d[i * n + j] = value;
+    C_d[i * size + j] = value;
     return;
 }
 
@@ -92,10 +93,10 @@ void cuda_mmul(float *A, float *B, float *C, int size)
 
     gpuErrchk(cudaMalloc((void **) &C_d, mem_size));
 
-    for (int i = 0; i < size / 1000; i++)
+    for (int i = 0; i < size / SUBSIZE; i++)
     {
-        for (int j = 0; j < size / 1000; j++)
-            cudaMatMul<<<dimBlock, dimGrid>>>(A_d, B_d, C_d, i, j, 1000);
+        for (int j = 0; j < size / SUBSIZE; j++)
+            cudaMatMul<<<dimBlock, dimGrid>>>(A_d, B_d, C_d, i, j, SUBSIZE, size);
     }
 
     gpuErrchk( cudaPeekAtLastError() );
