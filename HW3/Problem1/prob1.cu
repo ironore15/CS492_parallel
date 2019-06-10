@@ -8,8 +8,8 @@
 #define NANO 1000000000
 #define PGSIZE 0x1000
 #define SUBSIZE 1000
-#define BLOCK 128
-#define GRID 8
+#define BLOCK 8
+#define GRID 128
 
 int size;
 float *matrixA, *matrixB, *matrixBT, *matrixC_serial, *matrixC_cuda;
@@ -86,7 +86,7 @@ void cuda_mmul(float *A, float *B, float *C, int size)
     for (int i = 0; i < size / SUBSIZE; i++)
     {
         for (int j = 0; j < size / SUBSIZE; j++)
-            cudaMatMul<<<dimBlock, dimGrid>>>(A_d, B_d, C_d, i, j, SUBSIZE, size);
+            cudaMatMul<<<dimGrid, dimBlock>>>(A_d, B_d, C_d, i, j, SUBSIZE, size);
     }
 
     cudaMemcpy(C, C_d, mem_size, cudaMemcpyDeviceToHost);

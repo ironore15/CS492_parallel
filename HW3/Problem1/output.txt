@@ -1,0 +1,12 @@
+rm prob1
+nvcc -o prob1 prob1.cu
+Multi Thread Computation Start
+Multi Thread Computation End: 379099.594 us.
+Single Thread Computation Start
+Single Thread Computation End: 9826177.684 us.
+Verification Success.
+Multi Thread Computation Start
+Multi Thread Computation End: 9192165.869 us.
+Single Thread Computation Start
+Single Thread Computation End: 348756781.489 us.
+Verification Success.

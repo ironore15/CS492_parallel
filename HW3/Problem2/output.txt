@@ -1,0 +1,20 @@
+rm prob2
+nvcc -o prob2 prob2.cu
+Multi Thread Computation Start
+Multi Thread Computation End: 908275.731 us.
+L2-norm : 0.0104778
+Single Thread Computation Start
+Single Thread Computation End: 2697616.855 us.
+L2-norm : 8079.28
+Multi Thread Computation Start
+Multi Thread Computation End: 21112031.471 us.
+L2-norm : 0.0643869
+Single Thread Computation Start
+Single Thread Computation End: 73342858.098 us.
+L2-norm : 189.535
+Multi Thread Computation Start
+Multi Thread Computation End: 96175362.741 us.
+L2-norm : 0.266298
+Single Thread Computation Start
+Single Thread Computation End: 338714319.173 us.
+L2-norm : 89825.5
